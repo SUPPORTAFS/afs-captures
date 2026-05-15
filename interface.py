@@ -214,7 +214,7 @@ st.set_page_config(
 # -------------------------
 
 st.image(
-    "logo.png",
+    "Logo.png",
     width=220
 )
 
