@@ -14,38 +14,35 @@ from reportlab.platypus import (
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.pagesizes import A4
 
+
 # -------------------------
 # FONCTION ANALYSE VIDÉO
 # -------------------------
 
-def analyse_video(video_path, output_folder, prefix):
+def analyse_video(video_path, output_folder, prefix, max_captures=6):
 
     os.makedirs(output_folder, exist_ok=True)
 
     for file in os.listdir(output_folder):
-
-        os.remove(
-            os.path.join(output_folder, file)
-        )
+        os.remove(os.path.join(output_folder, file))
 
     interval_seconds = 3
-
     blur_threshold = 200
-
     difference_threshold = 15
 
     video = cv2.VideoCapture(video_path)
 
     fps = video.get(cv2.CAP_PROP_FPS)
 
-    frame_interval = int(
-        fps * interval_seconds
-    )
+    if fps == 0:
+        fps = 25
+
+    frame_interval = int(fps * interval_seconds)
 
     frame_count = 0
-
     capture_count = 0
 
+    # Important : doublons traités uniquement dans CETTE vidéo
     last_saved_gray = None
 
     while True:
@@ -55,53 +52,36 @@ def analyse_video(video_path, output_folder, prefix):
         if not success:
             break
 
+        if capture_count >= max_captures:
+            break
+
         if frame_count % frame_interval == 0:
 
-            gray = cv2.cvtColor(
-                frame,
-                cv2.COLOR_BGR2GRAY
-            )
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-            sharpness = cv2.Laplacian(
-                gray,
-                cv2.CV_64F
-            ).var()
+            sharpness = cv2.Laplacian(gray, cv2.CV_64F).var()
 
             if sharpness < blur_threshold:
-
                 frame_count += 1
-
                 continue
 
             if last_saved_gray is not None:
 
-                difference = cv2.absdiff(
-                    gray,
-                    last_saved_gray
-                )
-
-                mean_difference = np.mean(
-                    difference
-                )
+                difference = cv2.absdiff(gray, last_saved_gray)
+                mean_difference = np.mean(difference)
 
                 if mean_difference < difference_threshold:
-
                     frame_count += 1
-
                     continue
 
             image_path = os.path.join(
                 output_folder,
-                f"{prefix}_{capture_count}.jpg"
+                f"{prefix}_{capture_count + 1}.jpg"
             )
 
-            cv2.imwrite(
-                image_path,
-                frame
-            )
+            cv2.imwrite(image_path, frame)
 
             last_saved_gray = gray
-
             capture_count += 1
 
         frame_count += 1
@@ -125,12 +105,7 @@ def generate_pdf(selected_before, selected_after):
     )
 
     styles = getSampleStyleSheet()
-
     elements = []
-
-    # -------------------------
-    # TITRE
-    # -------------------------
 
     elements.append(
         Paragraph(
@@ -141,13 +116,9 @@ def generate_pdf(selected_before, selected_after):
 
     elements.append(Spacer(1, 20))
 
-    # -------------------------
-    # AVANT
-    # -------------------------
-
     elements.append(
         Paragraph(
-            "Captures AVANT",
+            "Captures AVANT intervention",
             styles["Heading2"]
         )
     )
@@ -163,20 +134,13 @@ def generate_pdf(selected_before, selected_after):
         )
 
         elements.append(img)
-
         elements.append(Spacer(1, 15))
 
-    # -------------------------
-    # APRÈS
-    # -------------------------
-
-    elements.append(
-        PageBreak()
-    )
+    elements.append(PageBreak())
 
     elements.append(
         Paragraph(
-            "Captures APRÈS",
+            "Captures APRÈS intervention",
             styles["Heading2"]
         )
     )
@@ -192,7 +156,6 @@ def generate_pdf(selected_before, selected_after):
         )
 
         elements.append(img)
-
         elements.append(Spacer(1, 15))
 
     doc.build(elements)
@@ -209,6 +172,7 @@ st.set_page_config(
     layout="wide"
 )
 
+
 # -------------------------
 # EN-TÊTE
 # -------------------------
@@ -218,13 +182,12 @@ st.image(
     width=220
 )
 
-st.title(
-    "Extraction de captures video"
-)
+st.title("Extraction de captures video")
 
 st.write(
     "Extraction intelligente des meilleures captures avant/après intervention."
 )
+
 
 # -------------------------
 # UPLOADS
@@ -240,30 +203,22 @@ uploaded_video_after = st.file_uploader(
     type=["mp4"]
 )
 
+
 # -------------------------
 # ANALYSE
 # -------------------------
 
-if (
-    uploaded_video_before is not None
-    and uploaded_video_after is not None
-):
+if uploaded_video_before is not None and uploaded_video_after is not None:
 
     video_before_path = "video_avant.mp4"
 
     with open(video_before_path, "wb") as f:
-
-        f.write(
-            uploaded_video_before.read()
-        )
+        f.write(uploaded_video_before.read())
 
     video_after_path = "video_apres.mp4"
 
     with open(video_after_path, "wb") as f:
-
-        f.write(
-            uploaded_video_after.read()
-        )
+        f.write(uploaded_video_after.read())
 
     st.success("Vidéos chargées")
 
@@ -271,19 +226,26 @@ if (
 
         with st.spinner("Analyse en cours..."):
 
-            analyse_video(
+            # 6 choix AVANT
+            count_before = analyse_video(
                 video_before_path,
                 "captures_avant",
-                "avant"
+                "avant",
+                max_captures=6
             )
 
-            analyse_video(
+            # 6 choix APRÈS
+            count_after = analyse_video(
                 video_after_path,
                 "captures_apres",
-                "apres"
+                "apres",
+                max_captures=6
             )
 
-        st.success("Analyse terminée")
+        st.success(
+            f"Analyse terminée : {count_before} captures AVANT et {count_after} captures APRÈS"
+        )
+
 
 # =========================
 # AFFICHAGE AVANT
@@ -295,18 +257,13 @@ if os.path.exists("captures_avant"):
 
     st.subheader("Captures AVANT")
 
-    files_before = sorted(
-        os.listdir("captures_avant")
-    )
+    files_before = sorted(os.listdir("captures_avant"))
 
     cols_before = st.columns(3)
 
     for index, file in enumerate(files_before):
 
-        image_path = os.path.join(
-            "captures_avant",
-            file
-        )
+        image_path = os.path.join("captures_avant", file)
 
         with cols_before[index % 3]:
 
@@ -321,10 +278,8 @@ if os.path.exists("captures_avant"):
             )
 
             if selected:
+                selected_before.append(image_path)
 
-                selected_before.append(
-                    image_path
-                )
 
 # =========================
 # AFFICHAGE APRÈS
@@ -336,18 +291,13 @@ if os.path.exists("captures_apres"):
 
     st.subheader("Captures APRÈS")
 
-    files_after = sorted(
-        os.listdir("captures_apres")
-    )
+    files_after = sorted(os.listdir("captures_apres"))
 
     cols_after = st.columns(3)
 
     for index, file in enumerate(files_after):
 
-        image_path = os.path.join(
-            "captures_apres",
-            file
-        )
+        image_path = os.path.join("captures_apres", file)
 
         with cols_after[index % 3]:
 
@@ -362,10 +312,8 @@ if os.path.exists("captures_apres"):
             )
 
             if selected:
+                selected_after.append(image_path)
 
-                selected_after.append(
-                    image_path
-                )
 
 # =========================
 # EXPORT PDF
