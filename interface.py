@@ -2,10 +2,6 @@ import streamlit as st
 import cv2
 import os
 import numpy as np
-from PIL import Image as PILImage
-
-from streamlit_drawable_canvas import st_canvas
-
 from docx import Document
 from docx.shared import Inches, Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -137,6 +133,9 @@ def add_heading(doc, text):
 
 
 def add_text(doc, text):
+    if not text:
+        text = "Non renseigné."
+
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
     run = p.add_run(text)
@@ -170,16 +169,15 @@ def generate_word(data, selected_before, selected_after):
     add_text(doc, f"Intervenant : {data['intervenant']}")
     add_text(doc, f"Date : {data['date']}")
     add_text(doc, f"Référence : {data['reference']}")
+    add_text(doc, f"Objet : {data['objet']}")
 
     doc.add_page_break()
 
-    # CONSTAT
     add_heading(doc, "1. Constat et objet de l’intervention")
     add_text(doc, reformuler_client(data["constat"], "avant"))
 
     doc.add_paragraph("")
 
-    # MATERIEL EN DUR
     add_heading(doc, "2. Matériels utilisés")
     add_text(
         doc,
@@ -201,7 +199,6 @@ def generate_word(data, selected_before, selected_after):
 
     doc.add_paragraph("")
 
-    # AVANT
     add_heading(doc, "4. État avant intervention")
     add_text(doc, reformuler_client(data["etat_avant"], "avant"))
 
@@ -211,13 +208,11 @@ def generate_word(data, selected_before, selected_after):
 
     doc.add_paragraph("")
 
-    # TRAVAUX
     add_heading(doc, "5. Intervention réalisée")
     add_text(doc, reformuler_client(data["travaux"], "travaux"))
 
     doc.add_paragraph("")
 
-    # APRES
     add_heading(doc, "6. État après intervention")
     add_text(doc, reformuler_client(data["etat_apres"], "apres"))
 
@@ -227,12 +222,10 @@ def generate_word(data, selected_before, selected_after):
 
     doc.add_paragraph("")
 
-    # CONCLUSION
     add_heading(doc, "7. Conclusion")
     add_text(doc, reformuler_client(data["conclusion"], "conclusion"))
 
     doc.save(doc_path)
-
     return doc_path
 
 
@@ -247,7 +240,7 @@ st.set_page_config(
 
 st.image("Logo.png", width=220)
 st.title("Générateur de rapport d’intervention")
-st.write("Inspection caméra, analyse avant/après, annotations et génération Word.")
+st.write("Inspection caméra, analyse avant/après et génération Word.")
 
 
 # =========================
@@ -344,63 +337,6 @@ if uploaded_video_before is not None and uploaded_video_after is not None:
         st.success(
             f"Analyse terminée : {count_before} captures AVANT et {count_after} captures APRÈS"
         )
-
-
-# =========================
-# ANNOTATION IMAGE
-# =========================
-
-st.header("Annotation des captures")
-
-all_images = []
-
-if os.path.exists("captures_avant"):
-    for file in sorted(os.listdir("captures_avant")):
-        all_images.append(os.path.join("captures_avant", file))
-
-if os.path.exists("captures_apres"):
-    for file in sorted(os.listdir("captures_apres")):
-        all_images.append(os.path.join("captures_apres", file))
-
-if all_images:
-    image_to_annotate = st.selectbox(
-        "Choisir une image à annoter",
-        all_images
-    )
-
-    pil_img = PILImage.open(image_to_annotate).convert("RGB")
-
-    max_width = 800
-    ratio = max_width / pil_img.width
-    canvas_width = max_width
-    canvas_height = int(pil_img.height * ratio)
-
-    resized_img = pil_img.resize((canvas_width, canvas_height))
-
-    st.write("Mode annotation : dessinez une flèche ou un repère rouge sur l’image.")
-
-    canvas_result = st_canvas(
-        fill_color="rgba(255, 0, 0, 0.3)",
-        stroke_width=5,
-        stroke_color="#FF0000",
-        background_image=resized_img.convert("RGBA"),
-        height=canvas_height,
-        width=canvas_width,
-        drawing_mode="line",
-        key=f"canvas_{image_to_annotate}",
-    )
-
-    if st.button("Sauvegarder l’image annotée"):
-        if canvas_result.image_data is not None:
-            annotated = PILImage.fromarray(
-                canvas_result.image_data.astype("uint8")
-            ).convert("RGB")
-
-            annotated_path = image_to_annotate.replace(".jpg", "_annotee.jpg")
-            annotated.save(annotated_path)
-
-            st.success("Image annotée sauvegardée")
-            st.image(annotated_path, use_container_width=True)
 
 
 # =========================
