@@ -2,3 +2,6 @@ streamlit
 opencv-python-headless
 numpy
 reportlab
+python-docx
+streamlit-drawable-canvas
+Pillow
