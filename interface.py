@@ -383,7 +383,7 @@ if all_images:
         fill_color="rgba(255, 0, 0, 0.3)",
         stroke_width=5,
         stroke_color="#FF0000",
-        background_image=resized_img,
+        background_image=resized_img.convert("RGBA"),
         height=canvas_height,
         width=canvas_width,
         drawing_mode="line",
