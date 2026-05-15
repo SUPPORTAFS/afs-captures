@@ -2,6 +2,9 @@ import streamlit as st
 import cv2
 import os
 import numpy as np
+
+from PIL import Image as PILImage, ImageDraw
+
 from docx import Document
 from docx.shared import Inches, Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -18,6 +21,66 @@ def clean_folder(folder):
             os.remove(os.path.join(folder, file))
         except:
             pass
+
+
+def ajouter_fleche(image_path, position):
+    image = PILImage.open(image_path).convert("RGB")
+    draw = ImageDraw.Draw(image)
+
+    largeur, hauteur = image.size
+
+    if position == "Centre":
+        start = (int(largeur * 0.20), int(hauteur * 0.50))
+        end = (int(largeur * 0.70), int(hauteur * 0.50))
+        arrow_head = [
+            (end[0], end[1]),
+            (end[0] - 35, end[1] - 20),
+            (end[0] - 35, end[1] + 20),
+        ]
+
+    elif position == "Haut":
+        start = (int(largeur * 0.20), int(hauteur * 0.25))
+        end = (int(largeur * 0.70), int(hauteur * 0.25))
+        arrow_head = [
+            (end[0], end[1]),
+            (end[0] - 35, end[1] - 20),
+            (end[0] - 35, end[1] + 20),
+        ]
+
+    elif position == "Bas":
+        start = (int(largeur * 0.20), int(hauteur * 0.75))
+        end = (int(largeur * 0.70), int(hauteur * 0.75))
+        arrow_head = [
+            (end[0], end[1]),
+            (end[0] - 35, end[1] - 20),
+            (end[0] - 35, end[1] + 20),
+        ]
+
+    elif position == "Gauche":
+        start = (int(largeur * 0.75), int(hauteur * 0.50))
+        end = (int(largeur * 0.25), int(hauteur * 0.50))
+        arrow_head = [
+            (end[0], end[1]),
+            (end[0] + 35, end[1] - 20),
+            (end[0] + 35, end[1] + 20),
+        ]
+
+    else:  # Droite
+        start = (int(largeur * 0.25), int(hauteur * 0.50))
+        end = (int(largeur * 0.75), int(hauteur * 0.50))
+        arrow_head = [
+            (end[0], end[1]),
+            (end[0] - 35, end[1] - 20),
+            (end[0] - 35, end[1] + 20),
+        ]
+
+    draw.line([start, end], fill="red", width=12)
+    draw.polygon(arrow_head, fill="red")
+
+    new_path = image_path.replace(".jpg", "_fleche.jpg")
+    image.save(new_path)
+
+    return new_path
 
 
 def analyse_video(video_path, output_folder, prefix, max_captures=6):
@@ -49,7 +112,6 @@ def analyse_video(video_path, output_folder, prefix, max_captures=6):
 
         if frame_count % frame_interval == 0:
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
             sharpness = cv2.Laplacian(gray, cv2.CV_64F).var()
 
             if sharpness < blur_threshold:
@@ -152,7 +214,6 @@ def generate_word(data, selected_before, selected_after):
 
     doc = Document()
 
-    # PAGE DE GARDE
     if os.path.exists("Logo.png"):
         p = doc.add_paragraph()
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -349,6 +410,48 @@ if uploaded_video_before is not None and uploaded_video_after is not None:
         st.success(
             f"Analyse terminée : {count_before} captures AVANT et {count_after} captures APRÈS"
         )
+
+
+# =========================
+# MODIFICATION DES CAPTURES
+# =========================
+
+st.header("Modifier une capture")
+
+images_modifiables = []
+
+if os.path.exists("captures_avant"):
+    for file in sorted(os.listdir("captures_avant")):
+        if file.endswith(".jpg"):
+            images_modifiables.append(os.path.join("captures_avant", file))
+
+if os.path.exists("captures_apres"):
+    for file in sorted(os.listdir("captures_apres")):
+        if file.endswith(".jpg"):
+            images_modifiables.append(os.path.join("captures_apres", file))
+
+if images_modifiables:
+    image_a_modifier = st.selectbox(
+        "Choisir une capture à modifier",
+        images_modifiables
+    )
+
+    st.image(image_a_modifier, use_container_width=True)
+
+    position_fleche = st.selectbox(
+        "Position de la flèche rouge",
+        ["Centre", "Haut", "Bas", "Gauche", "Droite"]
+    )
+
+    if st.button("Créer une copie avec flèche rouge"):
+        nouvelle_image = ajouter_fleche(
+            image_a_modifier,
+            position_fleche
+        )
+
+        st.success("Image modifiée créée. Elle apparaît maintenant dans les captures sélectionnables.")
+        st.image(nouvelle_image, use_container_width=True)
+        st.rerun()
 
 
 # =========================
