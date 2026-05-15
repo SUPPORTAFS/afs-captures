@@ -240,7 +240,19 @@ st.set_page_config(
 
 st.image("Logo.png", width=220)
 st.title("Générateur de rapport d’intervention")
-st.write("Inspection caméra, analyse avant/après et génération Word.")
+
+if st.button("Réinitialiser les captures"):
+    clean_folder("captures_avant")
+    clean_folder("captures_apres")
+
+    if os.path.exists("video_avant.mp4"):
+        os.remove("video_avant.mp4")
+
+    if os.path.exists("video_apres.mp4"):
+        os.remove("video_apres.mp4")
+
+    st.success("Captures réinitialisées. Vous pouvez charger de nouvelles vidéos.")
+    st.rerun()
 
 
 # =========================
@@ -318,7 +330,7 @@ if uploaded_video_before is not None and uploaded_video_after is not None:
 
     st.success("Vidéos chargées")
 
-    if st.button("Analyser les vidéos"):
+    if st.button("Sélectionner les captures à intégrer dans le rapport"):
         with st.spinner("Analyse en cours..."):
             count_before = analyse_video(
                 video_before_path,
